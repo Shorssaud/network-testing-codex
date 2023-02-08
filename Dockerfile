@@ -8,4 +8,5 @@ RUN apt update -qq && \
 RUN curl https://nim-lang.org/choosenim/init.sh -sSf | sh -s -- -y
 
 ARG corecount=1
-COPY . .
+EXPOSE 8080
+COPY nim-codex .

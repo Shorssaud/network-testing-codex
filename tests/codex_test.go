@@ -28,38 +28,41 @@ func TestHello(t *testing.T) {
 			nodes := c.MustNewNodes(5)
 
 			group, groupCtx := errgroup.WithContext(context.Background())
-			addrs := "/ip4/0.0.0.0/tcp/50880"
+			addrs := "/ip4/0.0.0.0/tcp/8090"
 			for i, node := range nodes {
 				node := node.Context(groupCtx)
 				if i == 0 {
-					// host node
-					stdout := &bytes.Buffer{}
-					stderr := &bytes.Buffer{}
-					_, err := node.StartProc(cluster.StartProcRequest{
-						Command: "./build/codex",
-						Args:    []string{"--nat=100.80.179.146", "--metrics", "--api-port=8080", "--data-dir=`pwd`/Codex1", "--disc-port=8090", "--log-level=TRACE", "-i=" + addrs, "-q=1099511627776"},
-						Stdout:  stdout,
-						Stderr:  stderr,
+					group.Go(func() error {
+						// host node
+						stdout := &bytes.Buffer{}
+						stderr := &bytes.Buffer{}
+						// when running api on 8080, the host node will not be able to connect to the client node
+						_, err := node.StartProc(cluster.StartProcRequest{
+							Command: "./build/codex",
+							Args:    []string{"--metrics", "--api-port=8090", "--data-dir=`pwd`/Codex1", "--disc-port=8080", "--log-level=TRACE", "-i=" + addrs, "-q=1099511627776"},
+							Stdout:  stdout,
+							Stderr:  stderr,
+						})
+						if err != nil {
+							t.Errorf(`starting client on node %d: %s`, i, err)
+							return err
+						}
+						if err != nil {
+							t.Errorf(`waiting for client on node %d: %s`, i, err)
+							return err
+						}
+						for true {
+							t.Logf("HOST Output: %s\n\n", stdout.String())
+							t.Logf("HOST EOutput: %s\n\n", stderr.String())
+						}
+						return nil
 					})
-					if err != nil {
-						t.Errorf(`starting client on node %d: %s`, i, err)
-						continue
-					}
-					// extract spr from host node output
 					time.Sleep(2 * time.Second)
-					if err != nil {
-						t.Errorf(`waiting for client on node %d: %s`, i, err)
-						continue
-					}
-					t.Logf("HOST Output: %s\n\n", stdout.String())
-					t.Logf("HOST EOutput: %s\n\n", stderr.String())
-					// t.Log("HOST proc: ", code)
-
 					continue
 				} else {
 					group.Go(func() error {
 						// wait for host to start
-						resp, err := http.Get("http://127.0.0.1:8080/api/codex/v1/info")
+						resp, err := http.Get("http://127.0.0.1:8090/api/codex/v1/info")
 						if err != nil {
 							log.Fatal(err)
 						}
@@ -93,7 +96,6 @@ func TestHello(t *testing.T) {
 			// TODO ping host using get request
 		})
 	}
-
 	// run(t, "local cluster", local.MustNewCluster())
-	run(t, "Docker cluster", docker.MustNewCluster().WithBaseImage("corbo12/nim-codex:v3"))
+	run(t, "Docker cluster", docker.MustNewCluster().WithBaseImage("corbo12/nim-codex:v5"))
 }
