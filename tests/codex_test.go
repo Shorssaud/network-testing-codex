@@ -25,10 +25,10 @@ func TestHello(t *testing.T) {
 			t.Cleanup(c.MustCleanup)
 
 			t.Logf("Launching %s nodes", name)
-			nodes := c.MustNewNodes(5)
+			nodes := c.MustNewNodes(2)
 
 			group, groupCtx := errgroup.WithContext(context.Background())
-			addrs := "/ip4/0.0.0.0/tcp/8090"
+			// addrs := "/ip4/0.0.0.0/tcp/8090"
 			for i, node := range nodes {
 				node := node.Context(groupCtx)
 				if i == 0 {
@@ -37,9 +37,10 @@ func TestHello(t *testing.T) {
 						stdout := &bytes.Buffer{}
 						stderr := &bytes.Buffer{}
 						// when running api on 8080, the host node will not be able to connect to the client node
+						// args "--metrics", "--api-port=8090", "--data-dir=`pwd`/Codex1", "--disc-port=8080", "--log-level=TRACE", "-i=" + addrs, "-q=1099511627776"
 						_, err := node.StartProc(cluster.StartProcRequest{
 							Command: "./build/codex",
-							Args:    []string{"--metrics", "--api-port=8090", "--data-dir=`pwd`/Codex1", "--disc-port=8080", "--log-level=TRACE", "-i=" + addrs, "-q=1099511627776"},
+							Args:    []string{},
 							Stdout:  stdout,
 							Stderr:  stderr,
 						})
@@ -51,13 +52,26 @@ func TestHello(t *testing.T) {
 							t.Errorf(`waiting for client on node %d: %s`, i, err)
 							return err
 						}
-						for true {
-							t.Logf("HOST Output: %s\n\n", stdout.String())
-							t.Logf("HOST EOutput: %s\n\n", stderr.String())
+						// codex seems to exit upon function exit
+						time.Sleep(2 * time.Second)
+						resp, err := http.Get("http://127.0.0.1:8080/api/codex/v1/info")
+						if err != nil {
+							t.Logf(err.Error())
+						} else {
+							fmt.Println(resp)
+							defer resp.Body.Close()
 						}
+						// a, _ := proc.Wait()
+						// t.Logf("HOST proc: %d", a)
+						fmt.Println("PENIISSISISISI")
+						fmt.Printf("HOST Output: %s\n\n", stdout.String())
+						fmt.Printf("HOST EOutput: %s\n\n", stderr.String())
+						// t.Logf("HOST Output: %s\n\n", stdout.String())
+						// t.Logf("HOST EOutput: %s\n\n", stderr.String())
+
 						return nil
 					})
-					time.Sleep(2 * time.Second)
+					time.Sleep(9 * time.Second)
 					continue
 				} else {
 					group.Go(func() error {
@@ -93,9 +107,8 @@ func TestHello(t *testing.T) {
 				// }
 			}
 			group.Wait()
-			// TODO ping host using get request
 		})
 	}
 	// run(t, "local cluster", local.MustNewCluster())
-	run(t, "Docker cluster", docker.MustNewCluster().WithBaseImage("corbo12/nim-codex:v5"))
+	run(t, "Docker cluster", docker.MustNewCluster().WithBaseImage("corbo12/nim-codex:v4"))
 }
