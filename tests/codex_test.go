@@ -36,11 +36,10 @@ func TestHello(t *testing.T) {
 						// host node
 						stdout := &bytes.Buffer{}
 						stderr := &bytes.Buffer{}
-						// when running api on 8080, the host node will not be able to connect to the client node
-						// args "--metrics", "--api-port=8090", "--data-dir=`pwd`/Codex1", "--disc-port=8080", "--log-level=TRACE", "-i=" + addrs, "-q=1099511627776"
+						// when running api on 8080, the host node will not be able to run due to nodeagent
 						_, err := node.StartProc(cluster.StartProcRequest{
 							Command: "./build/codex",
-							Args:    []string{},
+							Args:    []string{"--metrics", "--api-port=8090", "--data-dir=`pwd`/Codex1", "--disc-port=8070", "--log-level=TRACE"},
 							Stdout:  stdout,
 							Stderr:  stderr,
 						})
@@ -53,17 +52,18 @@ func TestHello(t *testing.T) {
 							return err
 						}
 						// codex seems to exit upon function exit
+						runout := &bytes.Buffer{}
+						runerr := &bytes.Buffer{}
 						time.Sleep(2 * time.Second)
-						resp, err := http.Get("http://127.0.0.1:8080/api/codex/v1/info")
-						if err != nil {
-							t.Logf(err.Error())
-						} else {
-							fmt.Println(resp)
-							defer resp.Body.Close()
-						}
-						// a, _ := proc.Wait()
-						// t.Logf("HOST proc: %d", a)
-						fmt.Println("PENIISSISISISI")
+						_, err = node.Run(cluster.StartProcRequest{
+							Command: "curl",
+							Args:    []string{"-vvv", "\"127.0.0.1:8090/api/codex/v1/debug/info\""},
+							Stdout:  runout,
+							Stderr:  runerr,
+						})
+						fmt.Println(runout)
+						fmt.Println(runerr)
+						fmt.Println("---------------------")
 						fmt.Printf("HOST Output: %s\n\n", stdout.String())
 						fmt.Printf("HOST EOutput: %s\n\n", stderr.String())
 						// t.Logf("HOST Output: %s\n\n", stdout.String())
@@ -76,7 +76,7 @@ func TestHello(t *testing.T) {
 				} else {
 					group.Go(func() error {
 						// wait for host to start
-						resp, err := http.Get("http://127.0.0.1:8090/api/codex/v1/info")
+						resp, err := http.Get("http://127.0.0.1:8090/api/codex/v1/debug/info")
 						if err != nil {
 							log.Fatal(err)
 						}
