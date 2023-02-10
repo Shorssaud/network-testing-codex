@@ -63,15 +63,28 @@ func TestHello(t *testing.T) {
 						runerr := &bytes.Buffer{}
 						// code below runs a local call to the api, WORKS only with localhost and not ip
 						time.Sleep(2 * time.Second)
-						_, err = node.Run(cluster.StartProcRequest{
-							Command: "curl",
-							Args:    []string{"http://" + addrs + ":8090/api/codex/v1/debug/info"},
-							Stdout:  runout,
-							Stderr:  runerr,
-						})
-						fmt.Println(runout)
-						if err != nil {
-							t.Errorf("%s", runerr)
+						for i := 0; i < 5; i++ {
+							group.Go(func() error {
+								proc, err := node.StartProc(cluster.StartProcRequest{
+									Command: "curl",
+									Args:    []string{"http://" + addrs + ":8090/api/codex/v1/debug/info"},
+									Stdout:  runout,
+									Stderr:  runerr,
+								})
+								if err != nil {
+									t.Errorf("HOST EOutput: %s\n", err)
+									return err
+								}
+								// fmt.Println("---------------------")
+								code, err := proc.Wait()
+								if err != nil {
+									t.Errorf("HOST EOutput: %s\n", err)
+									return err
+								}
+								fmt.Printf("HOST Exit code: %d\n", code.ExitCode)
+								// fmt.Println(runout)
+								return nil
+							})
 						}
 						// t.Logf("HOST Output: %s\n\n", stdout.String())
 						// t.Logf("HOST EOutput: %s\n\n", stderr.String())
@@ -80,27 +93,7 @@ func TestHello(t *testing.T) {
 					})
 					time.Sleep(5 * time.Second)
 					continue
-				} // else {
-				// 	group.Go(func() error {
-				// 		stdout := &bytes.Buffer{}
-				// 		stderr := &bytes.Buffer{}
-				// 		_, err := node.StartProc(cluster.StartProcRequest{
-				// 			Command: "./build/codex",
-				// 			Args:    []string{"--data-dir=\"$(pwd)/Codex2\"", "--api-port=8081", "--disc-port=8091", "--bootstrap-node=$(curl  http://127.0.0.1:8080/api/codex/v1/debug/info 2>/dev/null | jq -r .spr)", "--log-level=TRACE", "-i=/ip4/0.0.0.0/tcp/50881", "-q=1099511627776"},
-				// 			Stdout:  stdout,
-				// 			Stderr:  stderr,
-				// 		})
-				// 		if err != nil {
-				// 			t.Errorf(`starting client on node %d: %s`, i, err)
-				// 			return nil
-				// 		}
-				// 		t.Logf("CLIENT Output: %s\n\n", stdout.String())
-				// 		t.Logf("CLIENT EOutput: %s\n\n", stderr.String())
-				// 		// t.Log("CLIENT proc: ", code)
-
-				// 		return nil
-				// 	})
-				// }
+				}
 			}
 			// group.Go(func() error {
 			// 	// calls to the api local and with ip address, DOES NOT WORK
