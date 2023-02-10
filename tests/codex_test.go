@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log"
-	"net/http"
 	"testing"
 	"time"
 
@@ -28,7 +26,7 @@ func TestHello(t *testing.T) {
 			nodes := c.MustNewNodes(2)
 
 			group, groupCtx := errgroup.WithContext(context.Background())
-			// addrs := "/ip4/0.0.0.0/tcp/8090"
+			addrs := "127.0.0.1"
 			for i, node := range nodes {
 				node := node.Context(groupCtx)
 				if i == 0 {
@@ -37,54 +35,51 @@ func TestHello(t *testing.T) {
 						stdout := &bytes.Buffer{}
 						stderr := &bytes.Buffer{}
 						// when running api on 8080, the host node will not be able to run due to nodeagent
-						_, err := node.StartProc(cluster.StartProcRequest{
+
+						// gets node ip
+						_, err := node.Run(cluster.StartProcRequest{
+							Command: "hostname",
+							Args:    []string{"-I"},
+							Stdout:  stdout,
+						})
+						fmt.Println(stdout.String())
+
+						_, err = node.StartProc(cluster.StartProcRequest{
 							Command: "./build/codex",
 							Args:    []string{"--metrics", "--api-port=8090", "--data-dir=`pwd`/Codex1", "--disc-port=8070", "--log-level=TRACE"},
 							Stdout:  stdout,
 							Stderr:  stderr,
 						})
 						if err != nil {
-							t.Errorf(`starting client on node %d: %s`, i, err)
+							t.Errorf(`starting host on node %d: %s`, i, err)
+							t.Errorf("HOST EOutput: %s\n", stderr.String())
 							return err
 						}
-						if err != nil {
-							t.Errorf(`waiting for client on node %d: %s`, i, err)
-							return err
-						}
+						fmt.Println("---------------------")
+						fmt.Printf("HOST Output: %s\n", stdout.String())
+
 						// codex seems to exit upon function exit
 						runout := &bytes.Buffer{}
 						runerr := &bytes.Buffer{}
-						// code below runs a local call to the api, WORKS
-						// time.Sleep(2 * time.Second)
-						// _, err = node.Run(cluster.StartProcRequest{
-						// 	Command: "curl",
-						// 	Args:    []string{"http://127.0.0.1:8090/api/codex/v1/debug/info"},
-						// 	Stdout:  runout,
-						// 	Stderr:  runerr,
-						// })
+						// code below runs a local call to the api, WORKS only with localhost and not ip
+						time.Sleep(2 * time.Second)
+						_, err = node.Run(cluster.StartProcRequest{
+							Command: "curl",
+							Args:    []string{"http://" + addrs + ":8090/api/codex/v1/debug/info"},
+							Stdout:  runout,
+							Stderr:  runerr,
+						})
 						fmt.Println(runout)
-						fmt.Println(runerr)
-						fmt.Println("---------------------")
-						fmt.Printf("HOST Output: %s\n\n", stdout.String())
-						fmt.Printf("HOST EOutput: %s\n\n", stderr.String())
+						if err != nil {
+							t.Errorf("%s", runerr)
+						}
 						// t.Logf("HOST Output: %s\n\n", stdout.String())
 						// t.Logf("HOST EOutput: %s\n\n", stderr.String())
 
 						return nil
 					})
-					time.Sleep(9 * time.Second)
+					time.Sleep(5 * time.Second)
 					continue
-				} else {
-					group.Go(func() error {
-						// calls to the api, DOES NOT WORK
-						resp, err := http.Get("http://127.0.0.1:8090/api/codex/v1/debug/info")
-						if err != nil {
-							log.Fatal(err)
-						}
-						fmt.Println(resp)
-						defer resp.Body.Close()
-						return nil
-					})
 				} // else {
 				// 	group.Go(func() error {
 				// 		stdout := &bytes.Buffer{}
@@ -107,8 +102,19 @@ func TestHello(t *testing.T) {
 				// 	})
 				// }
 			}
+			// group.Go(func() error {
+			// 	// calls to the api local and with ip address, DOES NOT WORK
+			// 	resp, err := http.Get("http://" + addrs + ":8090/api/codex/v1/debug/info")
+			// 	if err != nil {
+			// 		log.Fatal(err)
+			// 	}
+			// 	fmt.Println(resp)
+			// 	defer resp.Body.Close()
+			// 	return nil
+			// })
 			group.Wait()
 		})
+
 	}
 	// run(t, "local cluster", local.MustNewCluster())
 	run(t, "Docker cluster", docker.MustNewCluster().WithBaseImage("corbo12/nim-codex:v4"))
