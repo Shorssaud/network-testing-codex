@@ -54,13 +54,14 @@ func TestHello(t *testing.T) {
 						// codex seems to exit upon function exit
 						runout := &bytes.Buffer{}
 						runerr := &bytes.Buffer{}
-						time.Sleep(2 * time.Second)
-						_, err = node.Run(cluster.StartProcRequest{
-							Command: "curl",
-							Args:    []string{"-vvv", "\"127.0.0.1:8090/api/codex/v1/debug/info\""},
-							Stdout:  runout,
-							Stderr:  runerr,
-						})
+						// code below runs a local call to the api, WORKS
+						// time.Sleep(2 * time.Second)
+						// _, err = node.Run(cluster.StartProcRequest{
+						// 	Command: "curl",
+						// 	Args:    []string{"http://127.0.0.1:8090/api/codex/v1/debug/info"},
+						// 	Stdout:  runout,
+						// 	Stderr:  runerr,
+						// })
 						fmt.Println(runout)
 						fmt.Println(runerr)
 						fmt.Println("---------------------")
@@ -75,7 +76,7 @@ func TestHello(t *testing.T) {
 					continue
 				} else {
 					group.Go(func() error {
-						// wait for host to start
+						// calls to the api, DOES NOT WORK
 						resp, err := http.Get("http://127.0.0.1:8090/api/codex/v1/debug/info")
 						if err != nil {
 							log.Fatal(err)
