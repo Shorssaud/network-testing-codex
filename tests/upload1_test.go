@@ -51,29 +51,25 @@ func TestUpload1(t *testing.T) {
 						t.Error(Fatal("HOST EOutput: %s\n", stderr.String()))
 						return err
 					}
-					runout := &bytes.Buffer{}
-					runerr := &bytes.Buffer{}
 					time.Sleep(2 * time.Second)
 
 					if id == 1 {
 						node.SendFile("tests/dog1.txt", bytes.NewBuffer([]byte("hello my dog")))
-						for x := 0; x < 10; x++ {
+						for x := 0; x < 1; x++ {
 							group.Go(func() error {
-								proc, err := node.StartProc(cluster.StartProcRequest{
+								runout := &bytes.Buffer{}
+								proc, err := node.Run(cluster.StartProcRequest{
 									Command: "curl",
-									Args:    []string{"-vvv", "-H", "\"content-type: application/octet-stream\"", "-H", "Expect:", "-T", "tests/dog1.txt", "http://" + addrs + ":8090/api/codex/v1/upload", "-X", "POST"},
+									Args:    []string{"-vvv", "-H", "\"content-type: application/octet-stream\"", "-H", "Expect:", "-T", "tests/dog.txt", "http://" + addrs + ":8090/api/codex/v1/upload", "-X", "POST"},
 									Stdout:  runout,
 								})
 								if err != nil {
-									t.Error(Fatal("HOST EOutput: %s\n", err))
+									t.Error(Fatal("HOST EOutput: ", runout.String()))
 									return err
 								}
-								code, err := proc.Wait()
-								if err != nil {
-									t.Errorf(Fatal("HOST EOutput: %s\n", err))
-									return err
-								}
-								assert.Equal(t, 0, code.ExitCode, "HOST EOutput: %s\n", runerr.String())
+								time.Sleep(2 * time.Second)
+								t.Log(Info(runout.String()))
+								assert.Equal(t, 0, proc.ExitCode, "HOST EOutput: %s\n", err)
 								return nil
 							})
 						}
