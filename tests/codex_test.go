@@ -1,7 +1,6 @@
 package codex
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"testing"
@@ -10,6 +9,7 @@ import (
 	"github.com/guseggert/clustertest/cluster"
 	"github.com/guseggert/clustertest/cluster/basic"
 	"github.com/guseggert/clustertest/cluster/docker"
+	"github.com/stretchr/testify/assert"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -29,59 +29,36 @@ func TestHello(t *testing.T) {
 			addrs := "127.0.0.1"
 			for i, node := range nodes {
 				node := node.Context(groupCtx)
-				if i == 0 {
+				if i <= 1 {
 					group.Go(func() error {
 						// host node
-						stdout := &bytes.Buffer{}
-						stderr := &bytes.Buffer{}
-						// when running api on 8080, the host node will not be able to run due to nodeagent
-
-						// gets node ip
-						_, err := node.Run(cluster.StartProcRequest{
-							Command: "hostname",
-							Args:    []string{"-I"},
-							Stdout:  stdout,
-						})
-						fmt.Println(stdout.String())
-
-						_, err = node.StartProc(cluster.StartProcRequest{
-							Command: "./build/codex",
-							Args:    []string{"--metrics", "--api-port=8090", "--data-dir=`pwd`/Codex1", "--disc-port=8070", "--log-level=TRACE"},
-							Stdout:  stdout,
-							Stderr:  stderr,
-						})
+						ip, err := getIp(groupCtx, node)
+						if err != nil {
+							t.Errorf("failed to get ip: %s", err)
+							t.Errorf("HOST EOutput: %s\n", ip)
+						}
+						fmt.Println("ip: ", ip)
+						output, err := createCodexInstance(groupCtx, node)
 						if err != nil {
 							t.Errorf(`starting host on node %d: %s`, i, err)
-							t.Errorf("HOST EOutput: %s\n", stderr.String())
+							t.Errorf("HOST EOutput: %s\n", output)
 							return err
 						}
-						fmt.Println("---------------------")
-						fmt.Printf("HOST Output: %s\n", stdout.String())
-
-						// codex seems to exit upon function exit
-						runout := &bytes.Buffer{}
-						runerr := &bytes.Buffer{}
 						// code below runs a local call to the api, WORKS only with localhost and not ip
 						time.Sleep(2 * time.Second)
-						for i := 0; i < 5; i++ {
+						t.Log(output)
+						for x := 0; x < 2; x++ {
 							group.Go(func() error {
-								proc, err := node.StartProc(cluster.StartProcRequest{
-									Command: "curl",
-									Args:    []string{"http://" + addrs + ":8090/api/codex/v1/debug/info"},
-									Stdout:  runout,
-									Stderr:  runerr,
-								})
+								output, code, err := debugInfoCall(groupCtx, node, addrs)
 								if err != nil {
-									t.Errorf("HOST EOutput: %s\n", err)
+									t.Errorf("failed to get debug info: %s", err)
+									t.Errorf("HOST EOutput: %s\n", output)
 									return err
 								}
-								// fmt.Println("---------------------")
-								code, err := proc.Wait()
-								if err != nil {
-									t.Errorf("HOST EOutput: %s\n", err)
-									return err
-								}
-								fmt.Printf("HOST Exit code: %d\n", code.ExitCode)
+								fmt.Println("---------------------")
+								t.Log(output)
+								assert.Equal(t, 0, code, "should be 200")
+								t.Logf("HOST %d Exit code: %d\n", i, code)
 								// fmt.Println(runout)
 								return nil
 							})
@@ -95,16 +72,6 @@ func TestHello(t *testing.T) {
 					continue
 				}
 			}
-			// group.Go(func() error {
-			// 	// calls to the api local and with ip address, DOES NOT WORK
-			// 	resp, err := http.Get("http://" + addrs + ":8090/api/codex/v1/debug/info")
-			// 	if err != nil {
-			// 		log.Fatal(err)
-			// 	}
-			// 	fmt.Println(resp)
-			// 	defer resp.Body.Close()
-			// 	return nil
-			// })
 			group.Wait()
 		})
 
