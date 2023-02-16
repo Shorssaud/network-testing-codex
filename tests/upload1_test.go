@@ -51,11 +51,8 @@ func TestUpload(t *testing.T) {
 							t.Error(Fatal("HOST EOutput: %s\n", stderr.String()))
 							return err
 						}
-
-						// codex seems to exit upon function exit
 						runout := &bytes.Buffer{}
 						runerr := &bytes.Buffer{}
-						// code below runs a local call to the api, WORKS only with localhost and not ip
 						time.Sleep(2 * time.Second)
 						if i == 1 {
 							node.SendFile("tests/dog1.txt", bytes.NewBuffer([]byte("hello my dog")))
@@ -81,9 +78,6 @@ func TestUpload(t *testing.T) {
 								})
 							}
 						}
-						// t.Logf("HOST Output: %s\n\n", stdout.String())
-						// t.Logf("HOST EOutput: %s\n\n", stderr.String())
-
 						return nil
 					})
 				}
