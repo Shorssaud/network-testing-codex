@@ -13,7 +13,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func TestUpload(t *testing.T) {
+func TestUpload1(t *testing.T) {
 	run := func(t *testing.T, name string, impl cluster.Cluster) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()

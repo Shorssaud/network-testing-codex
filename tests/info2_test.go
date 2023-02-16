@@ -1,4 +1,4 @@
-// This test is a simple test to check if the cluster is running and can be used
+// This test is a counter test to check if the tests are up to date and running correctly by applying an incorrect ip
 
 package codex
 
@@ -15,12 +15,11 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func TestInfo1(t *testing.T) {
+func TestInfo2(t *testing.T) {
 	run := func(t *testing.T, name string, impl cluster.Cluster) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			// Create the cluster.
 			c := basic.New(impl)
 			t.Cleanup(c.MustCleanup)
 
@@ -28,12 +27,11 @@ func TestInfo1(t *testing.T) {
 			nodes := c.MustNewNodes(2)
 
 			group, groupCtx := errgroup.WithContext(context.Background())
-			addrs := "127.0.0.1"
+			addrs := "127.0.0.2" // incorrect ip
 			for i, node := range nodes {
 				node := node.Context(groupCtx)
 				if i <= 1 {
 					group.Go(func() error {
-						// host node
 						ip, err := getIp(groupCtx, node)
 						if err != nil {
 							t.Errorf("failed to get ip: %s", err)
@@ -46,7 +44,6 @@ func TestInfo1(t *testing.T) {
 							t.Errorf("HOST EOutput: %s\n", output)
 							return err
 						}
-						// code below runs a local call to the api, WORKS only with localhost and not ip
 						time.Sleep(2 * time.Second)
 						t.Log(output)
 						for x := 0; x < 2; x++ {
@@ -59,15 +56,11 @@ func TestInfo1(t *testing.T) {
 								}
 								fmt.Println("---------------------")
 								t.Log(output)
-								assert.Equal(t, 0, code, "should be 0")
+								assert.NotEqual(t, 0, code, "should be not be 0")
 								t.Logf("HOST %d Exit code: %d\n", i, code)
-								// fmt.Println(runout)
 								return nil
 							})
 						}
-						// t.Logf("HOST Output: %s\n\n", stdout.String())
-						// t.Logf("HOST EOutput: %s\n\n", stderr.String())
-
 						return nil
 					})
 					time.Sleep(5 * time.Second)
