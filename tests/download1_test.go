@@ -13,7 +13,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func TestUpload1(t *testing.T) {
+func TestDownload1(t *testing.T) {
 	run := func(t *testing.T, name string, impl cluster.Cluster) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -59,6 +59,8 @@ func TestUpload1(t *testing.T) {
 							group.Go(func() error {
 								runout := &bytes.Buffer{}
 								runerr := &bytes.Buffer{}
+								runout.Reset()
+								runerr.Reset()
 								proc, err := node.StartProc(cluster.StartProcRequest{
 									Command: "curl",
 									Args:    []string{"-vvv", "-H", "content-type: application/octet-stream", "-H", "Expect:", "-T", "tests/dog1.txt", "http://" + addrs + ":8090/api/codex/v1/upload", "-X", "POST"},
@@ -69,10 +71,46 @@ func TestUpload1(t *testing.T) {
 									t.Error(Fatal("HOST EOutput: ", runout.String()))
 									return err
 								}
-								code, _ := proc.Wait()
-								t.Log(Info("CID: ", runout.String()))
+								_, err = proc.Wait()
+								if err != nil {
+									t.Error(Fatal("HOST EOutput: ", runout.String()))
+									return err
+								}
+								t.Log(Info(runout.String()))
 								t.Log(runerr.String())
-								assert.Equal(t, 0, code.ExitCode, "HOST EOutput: %s\n", err)
+								cid := runout.String()
+								runout.Reset()
+								runerr.Reset()
+								proc, err = node.StartProc(cluster.StartProcRequest{
+									Command: "curl",
+									Args:    []string{"-vvv", "http://" + addrs + ":8090/api/codex/v1/download<" + cid + ">", "--output", "tests/dog2.txt"},
+									Stdout:  runout,
+								})
+								_, _ = proc.Wait()
+								t.Log(Info(runout.String()))
+								t.Log(runerr.String())
+								runout.Reset()
+								runerr.Reset()
+								_, err = node.Run(cluster.StartProcRequest{
+									Command: "ls",
+									Args:    []string{"tests"},
+									Stdout:  runout,
+									Stderr:  runerr,
+								})
+								t.Log(Info(runout.String()))
+								t.Log(runerr.String())
+								runout.Reset()
+								runerr.Reset()
+								_, err = node.Run(cluster.StartProcRequest{
+									Command: "cat",
+									Args:    []string{"tests/dog2.txt"},
+									Stdout:  runout,
+									Stderr:  runerr,
+								})
+								t.Log(Info(runout.String()))
+								t.Log(runerr.String())
+								assert.Equal(t, "hello my dog", runout.String())
+
 								return nil
 							})
 						}
