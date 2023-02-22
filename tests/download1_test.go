@@ -54,11 +54,20 @@ func TestDownload1(t *testing.T) {
 					time.Sleep(2 * time.Second)
 
 					if id == 1 {
+						runout := &bytes.Buffer{}
+						runerr := &bytes.Buffer{}
+						_, err = node.Run(cluster.StartProcRequest{
+							Command: "ls",
+							Args:    []string{"tests"},
+							Stdout:  runout,
+							Stderr:  runerr,
+						})
+						t.Log(Info(runout.String()))
 						node.SendFile("tests/dog1.txt", bytes.NewBuffer([]byte("hello my dog")))
+						runout.Reset()
+						runerr.Reset()
 						for x := 0; x < 1; x++ {
 							group.Go(func() error {
-								runout := &bytes.Buffer{}
-								runerr := &bytes.Buffer{}
 								runout.Reset()
 								runerr.Reset()
 								proc, err := node.StartProc(cluster.StartProcRequest{
@@ -81,9 +90,19 @@ func TestDownload1(t *testing.T) {
 								cid := runout.String()
 								runout.Reset()
 								runerr.Reset()
+								_, err = node.Run(cluster.StartProcRequest{
+									Command: "ls",
+									Args:    []string{"tests"},
+									Stdout:  runout,
+									Stderr:  runerr,
+								})
+								t.Log(Info(runout.String()))
+								runout.Reset()
+								runerr.Reset()
+								t.Log(Info("CID: " + cid))
 								proc, err = node.StartProc(cluster.StartProcRequest{
 									Command: "curl",
-									Args:    []string{"-vvv", "http://" + addrs + ":8090/api/codex/v1/download<" + cid + ">", "--output", "tests/dog2.txt"},
+									Args:    []string{"-vvv", "http://" + addrs + ":8090/api/codex/v1/download/" + cid, "--output", "tests/dog2.txt"},
 									Stdout:  runout,
 								})
 								_, _ = proc.Wait()
@@ -93,7 +112,7 @@ func TestDownload1(t *testing.T) {
 								runerr.Reset()
 								_, err = node.Run(cluster.StartProcRequest{
 									Command: "ls",
-									Args:    []string{"tests"},
+									Args:    []string{"-l", "tests"},
 									Stdout:  runout,
 									Stderr:  runerr,
 								})
@@ -125,3 +144,5 @@ func TestDownload1(t *testing.T) {
 	// run(t, "local cluster", local.MustNewCluster())
 	run(t, "Docker cluster", docker.MustNewCluster().WithBaseImage("corbo12/nim-codex:v4"))
 }
+
+//TODO download file with other node
