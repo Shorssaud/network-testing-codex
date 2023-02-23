@@ -48,8 +48,9 @@ func TestDownload1(t *testing.T) {
 						runerr := &bytes.Buffer{}
 						_, err = node.StartProc(cluster.StartProcRequest{
 							Command: "./build/codex",
-							Args:    []string{"--metrics", "--api-port=8090", "--data-dir=`pwd`/Codex1", "--disc-port=8070", "--log-level=TRACE"},
+							Args:    []string{"--metrics", "--api-port=8090", "--data-dir=`pwd`/Codex1", "--disc-port=8070", "--log-level=TRACE", "-e=" + ip[:len(ip)-2]},
 							Stdout:  stdout,
+							Stderr:  stderr,
 						})
 
 						if err != nil {
@@ -62,9 +63,13 @@ func TestDownload1(t *testing.T) {
 						if err != nil {
 							t.Error(Fatal("failed to get debug info: %s", err))
 						}
+						t.Error(Fatal("NOPE", stderr.String()))
 						temp := strings.Split(out, "\"spr\":")
+						if len(temp) < 2 {
+							t.Error(Fatal("failed to get spr: ", temp))
+						}
 						t.Log(Info("debug info: ", out))
-						t.Log(Info("debug info: ", temp[1][1:len(temp[1])-2]))
+						t.Log(Info("debug info: ", temp[1][1:len(temp[1])-1]))
 						spr = temp[1][1 : len(temp[1])-2]
 						node.SendFile("tests/dog1.txt", bytes.NewBuffer([]byte("hello my dog")))
 						proc, err := node.StartProc(cluster.StartProcRequest{
@@ -91,7 +96,7 @@ func TestDownload1(t *testing.T) {
 						stderr := &bytes.Buffer{}
 						runout := &bytes.Buffer{}
 						runerr := &bytes.Buffer{}
-						_, err = node.StartProc(cluster.StartProcRequest{
+						_, err := node.StartProc(cluster.StartProcRequest{
 							Command: "./build/codex",
 							Args:    []string{"--metrics", "--api-port=8091", "--data-dir=`pwd`/Codex1", "--disc-port=8071", "--log-level=TRACE", "--bootstrap-node=" + spr},
 							Stdout:  stdout,
@@ -108,7 +113,7 @@ func TestDownload1(t *testing.T) {
 						t.Log(Info("CID: " + cid))
 						proc, err := node.StartProc(cluster.StartProcRequest{
 							Command: "curl",
-							Args:    []string{"-vvv", "http://" + addrs + ":8090/api/codex/v1/download/" + cid, "--output", "tests/dog2.txt"},
+							Args:    []string{"-vvv", "http://" + ip + ":8090/api/codex/v1/download/" + cid, "--output", "tests/dog2.txt"},
 							Stdout:  runout,
 						})
 						if err != nil {
