@@ -20,6 +20,7 @@ func TestDownload1(t *testing.T) {
 			var spr string
 			var cid string
 			var ip string
+			var err error
 			t.Parallel()
 
 			// Create the cluster.
@@ -36,11 +37,12 @@ func TestDownload1(t *testing.T) {
 				node := node.Context(groupCtx)
 				group.Go(func() error {
 					if id == 0 {
-						ip, err := getIp(groupCtx, node)
+						ip, err = getIp(groupCtx, node)
 						if err != nil {
 							t.Error(Fatal("failed to get ip: %s", err))
 							t.Error(Fatal("HOST EOutput: %s\n", ip))
 						}
+						ip = ip[:len(ip)-2]
 						t.Log(Info("ip: " + ip))
 						stdout := &bytes.Buffer{}
 						stderr := &bytes.Buffer{}
@@ -48,7 +50,7 @@ func TestDownload1(t *testing.T) {
 						runerr := &bytes.Buffer{}
 						_, err = node.StartProc(cluster.StartProcRequest{
 							Command: "./build/codex",
-							Args:    []string{"--metrics", "--api-port=8090", "--data-dir=`pwd`/Codex1", "--disc-port=8070", "--log-level=TRACE", "-e=" + ip[:len(ip)-2]},
+							Args:    []string{"--metrics", "--api-port=8090", "--data-dir=`pwd`/Codex1", "--disc-port=8070", "--log-level=TRACE"},
 							Stdout:  stdout,
 							Stderr:  stderr,
 						})
@@ -63,18 +65,19 @@ func TestDownload1(t *testing.T) {
 						if err != nil {
 							t.Error(Fatal("failed to get debug info: %s", err))
 						}
-						t.Error(Fatal("NOPE", stderr.String()))
 						temp := strings.Split(out, "\"spr\":")
 						if len(temp) < 2 {
-							t.Error(Fatal("failed to get spr: ", temp))
+							t.Error(Fatal("failed to get spr: ", stderr.String()))
+							return nil
 						}
 						t.Log(Info("debug info: ", out))
 						t.Log(Info("debug info: ", temp[1][1:len(temp[1])-1]))
+						t.Log(Info("IP: ", ip))
 						spr = temp[1][1 : len(temp[1])-2]
 						node.SendFile("tests/dog1.txt", bytes.NewBuffer([]byte("hello my dog")))
 						proc, err := node.StartProc(cluster.StartProcRequest{
 							Command: "curl",
-							Args:    []string{"-vvv", "-H", "content-type: application/octet-stream", "-H", "Expect:", "-T", "tests/dog1.txt", "http://" + addrs + ":8090/api/codex/v1/upload", "-X", "POST"},
+							Args:    []string{"-vvv", "-H", "content-type: application/octet-stream", "-H", "Expect:", "-T", "tests/dog1.txt", "http://" + ip + ":8090/api/codex/v1/upload", "-X", "POST"},
 							Stdout:  runout,
 							Stderr:  runerr,
 						})
@@ -115,6 +118,7 @@ func TestDownload1(t *testing.T) {
 							Command: "curl",
 							Args:    []string{"-vvv", "http://" + ip + ":8090/api/codex/v1/download/" + cid, "--output", "tests/dog2.txt"},
 							Stdout:  runout,
+							Stderr:  runerr,
 						})
 						if err != nil {
 							t.Error(Fatal("HOST EOutput: ", stderr.String()))
